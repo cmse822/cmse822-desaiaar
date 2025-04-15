@@ -1,0 +1,33 @@
+# GravityCollapse.yaml
+# Configuration file for the GravityCollapse problem in the Agoge simulation framework.
+problem_name: "collapse"
+GravityCollapse.mass_solar: 2.0e33
+GravityCollapse.r_jeans: 7.0e10
+GravityCollapse.grav_method: "cooley_tukey"
+
+config.G: 6.67e-8
+nx: 128
+ny: 128
+nz: 128                                        
+# cfl, sound_crossings, etc. 
+cfl: 0.25
+t_max: 100.0
+screen_out_interval: 2 #00000000
+output_dir: "output/GravityCollapse"
+dt_init: 0.1
+use_gravity: true
+do_euler_update: true
+do_io: true
+
+xmin: 0.0
+xmax: 2.0e11
+ymin: 0.0
+ymax: 2.0e11
+zmin: 0.0
+zmax: 2.0e11
+bc_xmin: "periodic"
+bc_xmax: "periodic"
+bc_ymin: "periodic"
+bc_ymax: "periodic"
+bc_zmin: "periodic"
+bc_zmax: "periodic"
