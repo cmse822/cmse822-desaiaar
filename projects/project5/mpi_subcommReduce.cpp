@@ -1,75 +1,85 @@
 #include <iostream>
 #include <cstdlib>
-#include <cmath>
 #include <mpi.h>
 
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     int rank, size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    // Check to make sure we have the argument for rowSize
-    if (argc < 2)
-    {
+    // Check for rowSize argument
+    if (argc < 2) {
         if (rank == 0)
-            std::cout << "Not enough arguments!" << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, 1);
+            std::cerr << "Usage: " << argv[0] << " <rowSize>\n";
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int rowSize = std::atoi(argv[1]);
+    if (rowSize <= 0 || size % rowSize != 0) {
+        if (rank == 0)
+            std::cerr << "Error: rowSize must be >0 and divide total processes (" 
+                      << size << ").\n";
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    // Let's initialize a "big" 2D array. For simplicity
-    // each rank will hold one value for now.
-    int myVal = rank;
+    // Compute 2D grid coords
+    int myVal    = rank;
+    int rowColor = rank / rowSize;   // which row
+    int colColor = rank % rowSize;   // which column
 
-    // Now, setup _two_ additional subcommunicators, one
-    // for rows, one for columns:
-    // 0 1 2
-    // 3 4 5
-    // 6 7 8
-    // So that rowComms has {0,1,2}, {3,4,5}, {6,7,8}
-    // and colComms has {0,3,6}, {1,4,7}, {2,6,8}
-    // We do this by assigning the right "color" to the ranks
-
-    // Now take command line argument to specify dimension of rows
-    int rowSize = atoi(argv[1]);
-    
-    int rowColor = // PUT CODE HERE 
-    int colColor = // PUT CODE HERE 
-
-    std::cout << "rank: " << rank << " row/col: (" << rowColor << "," << colColor << ")" << std::endl;
-
-    // Put a barrier after the print so everyone is together
+    // Print (row, col) in rank order
+    for (int p = 0; p < size; ++p) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == p) {
+            std::cout << "rank: " << rank
+                      << "  row/col: (" << rowColor << "," << colColor << ")\n";
+        }
+    }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // Create column comm
-    MPI_Comm colComm;
-    // PUT CODE HERE
+    // Create subcommunicators for rows and columns
+    MPI_Comm rowComm, colComm;
+    MPI_Comm_split(MPI_COMM_WORLD, rowColor, rank, &rowComm);
+    MPI_Comm_split(MPI_COMM_WORLD, colColor, rank, &colComm);
 
-    // Create row comm
-    MPI_Comm rowComm;
-    // PUT CODE HERE
-
-    // Get the rank within the new communicators
+    // Get local ranks within subcomms
     int rowRank, colRank;
-    // PUT CODE HERE
+    MPI_Comm_rank(rowComm, &rowRank);
+    MPI_Comm_rank(colComm, &colRank);
 
-    // Now perform reduction along rows and columns
-    int rowSum, colSum;
-    // PUT CODE HERE
+    // Reduce sums of global ranks within each subcomm
+    int rowSum = 0, colSum = 0;
+    MPI_Reduce(&myVal, &rowSum, 1, MPI_INT, MPI_SUM, 0, rowComm);
+    MPI_Reduce(&myVal, &colSum, 1, MPI_INT, MPI_SUM, 0, colComm);
 
-    // Have the rank 0's in both comms print out the results
-    if (rowRank==0)
-    {
-        std::cout << "Row " << rowColor << " rank 0: " << rank << ", sum:" << rowSum << std::endl;
+    // Print row‐sums in row order, from each rowComm root
+    int nRows = size / rowSize;
+    for (int r = 0; r < nRows; ++r) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rowColor == r && rowRank == 0) {
+            std::cout << "Row " << r
+                      << " root (global rank " << rank << "): sum = "
+                      << rowSum << "\n";
+        }
     }
-    if (colRank==0)
-    {
-        std::cout << "Col " << colColor << " rank 0: " << rank << ", sum:" << colSum << std::endl;
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    // call Finalize
+    // Print col‐sums in column order, from each colComm root
+    int nCols = rowSize;
+    for (int c = 0; c < nCols; ++c) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (colColor == c && colRank == 0) {
+            std::cout << "Col " << c
+                      << " root (global rank " << rank << "): sum = "
+                      << colSum << "\n";
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Clean up
+    MPI_Comm_free(&rowComm);
+    MPI_Comm_free(&colComm);
     MPI_Finalize();
-
+    return 0;
 }
