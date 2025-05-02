@@ -20,4 +20,4 @@
  - mpi_subcommReduce.cpp also passes the checks, and looks correct
  - No report needed for project 5 submissions.
 
-49/50
+50/50
